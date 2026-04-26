@@ -1,0 +1,16 @@
+[package]
+name = "gluebox-core"
+version = "0.1.0"
+edition = "2024"
+description = "Shared primitives for gluebox and unibox — connector lifecycle, registry, LIF power management, config hot-reload."
+license = "Apache-2.0"
+
+[dependencies]
+anyhow = "1"
+tokio = { version = "1", features = ["sync", "rt", "macros", "time"] }
+toml = "0.8"
+tracing = "0.1"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
