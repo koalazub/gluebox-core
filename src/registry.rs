@@ -9,6 +9,12 @@ pub struct ConnectorRegistry {
     auto_suspended: RwLock<HashSet<String>>,
 }
 
+impl Default for ConnectorRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConnectorRegistry {
     pub fn new() -> Self {
         Self {
@@ -17,7 +23,11 @@ impl ConnectorRegistry {
         }
     }
 
-    pub async fn register(&self, name: String, connector: Arc<dyn Connector>) -> anyhow::Result<()> {
+    pub async fn register(
+        &self,
+        name: String,
+        connector: Arc<dyn Connector>,
+    ) -> anyhow::Result<()> {
         connector.start().await?;
         self.connectors.write().await.insert(name, connector);
         Ok(())
@@ -75,11 +85,10 @@ impl ConnectorRegistry {
         let lock = self.connectors.read().await;
         let mut suspended = self.auto_suspended.write().await;
         for name in suspended.iter() {
-            if let Some(conn) = lock.get(name) {
-                if let Err(e) = conn.resume().await {
+            if let Some(conn) = lock.get(name)
+                && let Err(e) = conn.resume().await {
                     tracing::error!("failed to resume {name}: {e}");
                 }
-            }
         }
         suspended.clear();
     }
@@ -113,10 +122,10 @@ impl ConnectorRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::connector::{Connector, ConnectorStatus};
     use std::future::Future;
     use std::pin::Pin;
     use std::sync::atomic::{AtomicU8, Ordering};
-    use crate::connector::{Connector, ConnectorStatus};
 
     struct TestConnector {
         status: AtomicU8,
@@ -173,7 +182,10 @@ mod tests {
     async fn register_starts_connector() {
         let registry = ConnectorRegistry::new();
         let conn = Arc::new(TestConnector::new("test"));
-        registry.register("test".into(), conn.clone()).await.unwrap();
+        registry
+            .register("test".into(), conn.clone())
+            .await
+            .unwrap();
         assert!(matches!(conn.status(), ConnectorStatus::Running));
     }
 
@@ -181,7 +193,10 @@ mod tests {
     async fn deregister_stops_connector() {
         let registry = ConnectorRegistry::new();
         let conn = Arc::new(TestConnector::new("test"));
-        registry.register("test".into(), conn.clone()).await.unwrap();
+        registry
+            .register("test".into(), conn.clone())
+            .await
+            .unwrap();
         let removed = registry.deregister("test").await.unwrap();
         assert!(removed.is_some());
         assert!(matches!(conn.status(), ConnectorStatus::Stopped));
@@ -191,7 +206,10 @@ mod tests {
     async fn toggle_stops_running_connector() {
         let registry = ConnectorRegistry::new();
         let conn = Arc::new(TestConnector::new("test"));
-        registry.register("test".into(), conn.clone()).await.unwrap();
+        registry
+            .register("test".into(), conn.clone())
+            .await
+            .unwrap();
         let status = registry.toggle("test").await.unwrap();
         assert!(matches!(status, ConnectorStatus::Stopped));
     }
@@ -200,7 +218,10 @@ mod tests {
     async fn toggle_starts_stopped_connector() {
         let registry = ConnectorRegistry::new();
         let conn = Arc::new(TestConnector::new("test"));
-        registry.register("test".into(), conn.clone()).await.unwrap();
+        registry
+            .register("test".into(), conn.clone())
+            .await
+            .unwrap();
         registry.toggle("test").await.unwrap();
         let status = registry.toggle("test").await.unwrap();
         assert!(matches!(status, ConnectorStatus::Running));
@@ -216,9 +237,18 @@ mod tests {
     #[tokio::test]
     async fn list_returns_all_connectors() {
         let registry = ConnectorRegistry::new();
-        registry.register("alpha".into(), Arc::new(TestConnector::new("alpha"))).await.unwrap();
-        registry.register("beta".into(), Arc::new(TestConnector::new("beta"))).await.unwrap();
-        registry.register("gamma".into(), Arc::new(TestConnector::new("gamma"))).await.unwrap();
+        registry
+            .register("alpha".into(), Arc::new(TestConnector::new("alpha")))
+            .await
+            .unwrap();
+        registry
+            .register("beta".into(), Arc::new(TestConnector::new("beta")))
+            .await
+            .unwrap();
+        registry
+            .register("gamma".into(), Arc::new(TestConnector::new("gamma")))
+            .await
+            .unwrap();
         let list = registry.list().await;
         assert_eq!(list.len(), 3);
         let names: Vec<_> = list.iter().map(|(n, _)| n.as_str()).collect();
@@ -243,7 +273,10 @@ mod tests {
     async fn suspend_all_then_resume_all_restarts_connector() {
         let registry = ConnectorRegistry::new();
         let conn = Arc::new(TestConnector::new("test"));
-        registry.register("test".into(), conn.clone()).await.unwrap();
+        registry
+            .register("test".into(), conn.clone())
+            .await
+            .unwrap();
         assert!(matches!(conn.status(), ConnectorStatus::Running));
 
         registry.suspend_all().await;
@@ -257,7 +290,10 @@ mod tests {
     async fn resume_all_does_not_restart_manually_stopped_connector() {
         let registry = ConnectorRegistry::new();
         let conn = Arc::new(TestConnector::new("test"));
-        registry.register("test".into(), conn.clone()).await.unwrap();
+        registry
+            .register("test".into(), conn.clone())
+            .await
+            .unwrap();
 
         conn.stop().await.unwrap();
         assert!(matches!(conn.status(), ConnectorStatus::Stopped));
@@ -270,7 +306,10 @@ mod tests {
     async fn repeated_suspend_resume_cycles_stay_consistent() {
         let registry = ConnectorRegistry::new();
         let conn = Arc::new(TestConnector::new("test"));
-        registry.register("test".into(), conn.clone()).await.unwrap();
+        registry
+            .register("test".into(), conn.clone())
+            .await
+            .unwrap();
 
         for _ in 0..3 {
             registry.suspend_all().await;

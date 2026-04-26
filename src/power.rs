@@ -57,7 +57,10 @@ impl PowerManager {
         anyhow::ensure!(config.spike_weight > 0.0, "spike_weight must be > 0");
         anyhow::ensure!(config.decay_rate > 0.0, "decay_rate must be > 0");
         anyhow::ensure!(config.threshold > 0.0, "threshold must be > 0");
-        anyhow::ensure!(config.tick_interval_secs > 0, "tick_interval_secs must be > 0");
+        anyhow::ensure!(
+            config.tick_interval_secs > 0,
+            "tick_interval_secs must be > 0"
+        );
         Ok(())
     }
 
@@ -67,12 +70,11 @@ impl PowerManager {
         *potential += config.spike_weight;
         *self.last_spike_at.lock().unwrap() = Instant::now();
 
-        if *potential >= config.threshold {
-            if *self.state_tx.borrow() == PowerState::Resting {
+        if *potential >= config.threshold
+            && *self.state_tx.borrow() == PowerState::Resting {
                 *self.active_since.lock().unwrap() = Some(Instant::now());
                 let _ = self.state_tx.send(PowerState::Active);
             }
-        }
     }
 
     pub fn tick(&self) {
@@ -82,13 +84,12 @@ impl PowerManager {
 
         if *potential < config.threshold && *self.state_tx.borrow() == PowerState::Active {
             let active_since = self.active_since.lock().unwrap();
-            if let Some(since) = *active_since {
-                if since.elapsed().as_secs() >= config.min_active_secs {
+            if let Some(since) = *active_since
+                && since.elapsed().as_secs() >= config.min_active_secs {
                     drop(active_since);
                     *self.active_since.lock().unwrap() = None;
                     let _ = self.state_tx.send(PowerState::Resting);
                 }
-            }
         }
     }
 
@@ -124,7 +125,12 @@ impl PowerManager {
 mod tests {
     use super::*;
 
-    fn config_with(threshold: f64, decay_rate: f64, spike_weight: f64, min_active_secs: u64) -> PowerConfig {
+    fn config_with(
+        threshold: f64,
+        decay_rate: f64,
+        spike_weight: f64,
+        min_active_secs: u64,
+    ) -> PowerConfig {
         PowerConfig {
             threshold,
             decay_rate,
