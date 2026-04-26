@@ -70,11 +70,10 @@ impl PowerManager {
         *potential += config.spike_weight;
         *self.last_spike_at.lock().unwrap() = Instant::now();
 
-        if *potential >= config.threshold
-            && *self.state_tx.borrow() == PowerState::Resting {
-                *self.active_since.lock().unwrap() = Some(Instant::now());
-                let _ = self.state_tx.send(PowerState::Active);
-            }
+        if *potential >= config.threshold && *self.state_tx.borrow() == PowerState::Resting {
+            *self.active_since.lock().unwrap() = Some(Instant::now());
+            let _ = self.state_tx.send(PowerState::Active);
+        }
     }
 
     pub fn tick(&self) {
@@ -85,11 +84,12 @@ impl PowerManager {
         if *potential < config.threshold && *self.state_tx.borrow() == PowerState::Active {
             let active_since = self.active_since.lock().unwrap();
             if let Some(since) = *active_since
-                && since.elapsed().as_secs() >= config.min_active_secs {
-                    drop(active_since);
-                    *self.active_since.lock().unwrap() = None;
-                    let _ = self.state_tx.send(PowerState::Resting);
-                }
+                && since.elapsed().as_secs() >= config.min_active_secs
+            {
+                drop(active_since);
+                *self.active_since.lock().unwrap() = None;
+                let _ = self.state_tx.send(PowerState::Resting);
+            }
         }
     }
 

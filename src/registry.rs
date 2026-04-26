@@ -86,9 +86,10 @@ impl ConnectorRegistry {
         let mut suspended = self.auto_suspended.write().await;
         for name in suspended.iter() {
             if let Some(conn) = lock.get(name)
-                && let Err(e) = conn.resume().await {
-                    tracing::error!("failed to resume {name}: {e}");
-                }
+                && let Err(e) = conn.resume().await
+            {
+                tracing::error!("failed to resume {name}: {e}");
+            }
         }
         suspended.clear();
     }
